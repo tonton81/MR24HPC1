@@ -36,11 +36,11 @@ typedef struct RADAR_message_t {
   } presence;
 
   struct {
-    uint8_t staticDistance = 0;
+    float staticDistance = 0;
     uint8_t existanceEnergy = 0;
     uint8_t motionEnergy = 0;
-    uint8_t motionDistance = 0;
-    uint8_t motionSpeed = 0;
+    float motionDistance = 0;
+    float motionSpeed = 0;
   } custom;
 
 
@@ -131,6 +131,7 @@ class MR24HPC1 {
 		void debug(bool state) { _debug = state; }
 		
 		uint8_t convert_distance_float(float f);
+		float motionspeed_calculate(uint8_t val);
 		String module_reset(); // soft reset, active profile continues.
 		String heartbeat_pack_query();
 		void onReceive(RADARCB_ptr handler); /* callback function */

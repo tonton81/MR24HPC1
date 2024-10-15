@@ -3,17 +3,7 @@
 
 uint8_t MR24HPC1::convert_distance_float(float f) {
   f = (round(constrain(f, 0.5, 5.0) * 2.0) / 2.0);
-  if ( f == 0.5 ) return 1;
-  else if ( f == 1.0 ) return 2;
-  else if ( f == 1.5 ) return 3;
-  else if ( f == 2.0 ) return 4;
-  else if ( f == 2.5 ) return 5;
-  else if ( f == 3.0 ) return 6;
-  else if ( f == 3.5 ) return 7;
-  else if ( f == 4.0 ) return 8;
-  else if ( f == 4.5 ) return 9;
-  else if ( f == 5.0 ) return 10;
-  return 10;
+  return (uint8_t)(f * 2);
 }
 
 
@@ -27,7 +17,19 @@ void MR24HPC1::processing() {
   //}
   cbData.occupied.duration = millis() - _time_occupied;
   cbData.movement.duration = millis() - _time_movement;
+  cbData.custom.motionSpeed = motionspeed_calculate(cbData.custom.motionSpeed);
+  cbData.custom.motionDistance = cbData.custom.motionDistance * 0.5f;
+  cbData.custom.staticDistance = cbData.custom.staticDistance * 0.5f;
 }
+
+
+float MR24HPC1::motionspeed_calculate(uint8_t val) {
+  if (val == 0xA) return 0;
+  else if (val > 0xA) return -((val-10) * 0.5f);
+  else if (val < 0xA) return (val) * 0.5f;
+  return 0;
+}
+
 
 void MR24HPC1::Standard(RADAR_SCENE_MODE scene, RADAR_SENSITIVITY_LEVEL sens, RADAR_UNMANNED_TIME t) {
   underlying_open_function_information_output_switch(false);
