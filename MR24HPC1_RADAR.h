@@ -5,10 +5,18 @@
 
 typedef struct RADAR_message_t {
   bool heartbeat = false;
-  uint32_t duration = millis();
+
+  struct {
+    uint32_t duration = millis();
+  } occupied;
+
   struct {
     char info[12] = ""; 
     uint8_t value = 0;
+    uint32_t duration = millis();
+    struct {
+      uint32_t count = 0;
+    } trigger;
   } movement;
   struct {
     char info[40] = "No State"; 
@@ -111,12 +119,18 @@ class MR24HPC1 {
 		uint32_t read_sensor(uint32_t frame_id_request = 0x99999999);
 		uint8_t checksum_MR24HPC1(uint8_t* arr, uint8_t len, bool send);
 		uint32_t _time_occupied = 0;
+		uint32_t _time_movement = 0;
+		uint8_t last_movement = 0;
 		void processing();
+		bool _communication = false;
+		uint32_t _communication_timeout = 0;
 
 	public:
 		MR24HPC1(Stream *s):stream(s){;}
+		bool communication() { return _communication; }
 		void debug(bool state) { _debug = state; }
 		
+		uint8_t convert_distance_float(float f);
 		String module_reset(); // soft reset, active profile continues.
 		String heartbeat_pack_query();
 		void onReceive(RADARCB_ptr handler); /* callback function */

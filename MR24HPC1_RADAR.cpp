@@ -1,16 +1,32 @@
 #include "MR24HPC1_RADAR.h"
 
 
+uint8_t MR24HPC1::convert_distance_float(float f) {
+  f = (round(constrain(f, 0.5, 5.0) * 2.0) / 2.0);
+  if ( f == 0.5 ) return 1;
+  else if ( f == 1.0 ) return 2;
+  else if ( f == 1.5 ) return 3;
+  else if ( f == 2.0 ) return 4;
+  else if ( f == 2.5 ) return 5;
+  else if ( f == 3.0 ) return 6;
+  else if ( f == 3.5 ) return 7;
+  else if ( f == 4.0 ) return 8;
+  else if ( f == 4.5 ) return 9;
+  else if ( f == 5.0 ) return 10;
+  return 10;
+}
+
 
 void MR24HPC1::onReceive(RADARCB_ptr handler) {
 	_handler = handler;
 }
 
 void MR24HPC1::processing() {
-  if ( !cbData.presence.value ) {
-    _time_occupied = millis();
-  }
-  cbData.duration = millis() - _time_occupied;
+  //if ( !cbData.presence.value ) {
+  //  _time_occupied = millis();
+  //}
+  cbData.occupied.duration = millis() - _time_occupied;
+  cbData.movement.duration = millis() - _time_movement;
 }
 
 void MR24HPC1::Standard(RADAR_SCENE_MODE scene, RADAR_SENSITIVITY_LEVEL sens, RADAR_UNMANNED_TIME t) {
@@ -23,14 +39,24 @@ void MR24HPC1::Standard(RADAR_SCENE_MODE scene, RADAR_SENSITIVITY_LEVEL sens, RA
 void MR24HPC1::Custom(uint8_t mode, uint8_t existT, uint8_t motT, float mTB, uint32_t motTT, uint32_t motST, float ePB, uint32_t unmanT) {
   mTB = round(constrain(mTB, 0.5, 5) * 2) / 2;
   ePB = round(constrain(ePB, 0.5, 5) * 2) / 2;
+  if ( _debug ) {
+    Serial.print("Motion Trigger Boundary set to ");
+    Serial.print(mTB);
+    Serial.print("m. Data Value: ");
+    Serial.println(convert_distance_float(mTB));
+    Serial.print("Existance Perception Boundary set to ");
+    Serial.print(ePB);
+    Serial.print("m. Data Value: ");
+    Serial.println(convert_distance_float(ePB));
+  }
   underlying_open_function_information_output_switch(true);
   custom_mode_setting(mode);
   existence_judgment_threshold_settings(existT);
   motion_trigger_threshold_settings(motT);
-  motion_trigger_boundary_setting(mTB);
+  motion_trigger_boundary_setting(convert_distance_float(mTB));
   motion_trigger_time_setting(motTT);
   motion_to_still_time_setting(motST);
-  existence_perception_boundary_settings(ePB);
+  existence_perception_boundary_settings(convert_distance_float(ePB));
   time_for_entering_no_person_state_setting(unmanT);
   end_of_custom_mode_settings();
 }
@@ -847,7 +873,7 @@ String MR24HPC1::time_for_entering_no_person_state_setting(uint32_t ms) { // 0~3
 
   }
 
-/*
+/* DEFERRED
   checksum_MR24HPC1(arr, sizeof(arr), true);
 
   uint32_t result = -1;
@@ -904,6 +930,28 @@ uint32_t MR24HPC1::read_sensor(uint32_t frame_id_request) {
   int len = 0;
   unsigned char _data[32] = {0};
   char _hex[4];
+
+  if ( !cbData.presence.value ) {
+    _time_occupied = millis();
+    cbData.movement.trigger.count = 0;
+  }
+
+
+  if ( last_movement <= 1 && cbData.movement.value > 1 ) {
+    cbData.movement.trigger.count++;
+  }
+  last_movement = cbData.movement.value;
+  if ( last_movement <= 1 ) {
+    _time_movement = millis();
+  }
+
+
+
+  if ( _communication == true && (millis() - _communication_timeout > 3000) ) {
+    _communication = false;
+  }
+
+
   while (stream->available()) {
     if (stream->read() == 0x53) {
       if (stream->read() == 0x59) {
@@ -916,6 +964,8 @@ uint32_t MR24HPC1::read_sensor(uint32_t frame_id_request) {
           uint32_t checksum = 0;
           for ( int i = 0; i < len - 3; i++ ) checksum = checksum + _data[i];
           if ( _data[len - 3] == (uint8_t)checksum ) {
+            _communication_timeout = millis();
+            _communication = true;
             uint32_t frame = (_data[2] << 24) | (_data[3] << 16) | (_data[4] << 8) | _data[5];
             if ( frame == 0x1010001 ) { // heartbeat_pack_query
               if ( _handler ) { cbData.heartbeat = true; processing(); _handler(cbData); cbData.heartbeat = false; }
